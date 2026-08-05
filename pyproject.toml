@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "health-os"
+version = "0.1.0"
+description = "Health OS backend foundation."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "Django>=5.2,<5.3",
+    "django-cors-headers>=4.4,<5.0",
+    "djangorestframework>=3.15,<4.0",
+    "django-environ>=0.11,<1.0",
+    "drf-spectacular>=0.27,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.11,<2.0",
+    "pre-commit>=3.8,<4.0",
+    "pytest>=8.3,<9.0",
+    "pytest-cov>=5.0,<6.0",
+    "pytest-django>=4.9,<5.0",
+    "ruff>=0.6,<1.0",
+]
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["backend"]
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+testpaths = ["backend"]
+addopts = "-ra --cov=health_os --cov-report=term-missing"
+
+[tool.coverage.run]
+branch = true
+source = ["backend/health_os"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["backend"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = []
+strict = true
+mypy_path = "backend"
+exclude = [
+    "backend/.venv",
+    "backend/.*/migrations/.*",
+    "docs",
+    "design",
+    "infra",
+    "mobile",
+    "product",
+    "Prompts",
+    "scripts",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "django.*",
+    "rest_framework.*",
+    "drf_spectacular.*",
+    "environ.*",
+]
+ignore_missing_imports = true

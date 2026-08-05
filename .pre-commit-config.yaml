@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - Django>=5.2,<5.3
+          - django-cors-headers>=4.4,<5.0
+          - django-environ>=0.11,<1.0
+          - djangorestframework>=3.15,<4.0
+          - drf-spectacular>=0.27,<1.0
