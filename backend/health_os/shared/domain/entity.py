@@ -10,6 +10,15 @@ class Entity[EntityId]:
     def id(self) -> EntityId:
         return self._id
 
+    def __eq__(self, other: object) -> bool:
+        if type(self) is not type(other):
+            return False
+
+        return self.id == other.id
+
+    def __hash__(self) -> int:
+        return hash((type(self), self.id))
+
     @property
     def domain_events(self) -> tuple[DomainEvent, ...]:
         return tuple(self._domain_events)
