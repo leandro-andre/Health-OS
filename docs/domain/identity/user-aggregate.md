@@ -10,6 +10,8 @@ Dados de saúde não pertencem ao User. Informações clínicas, perfil de saúd
 
 ### User
 
+User é o Aggregate Root de Identity para a identidade lógica de uma pessoa.
+
 Responsabilidade:
 
 - representar a identidade do usuário;
@@ -18,7 +20,7 @@ Responsabilidade:
 - manter seu nome;
 - proteger as invariantes relacionadas à identidade.
 
-Estado inicialmente planejado:
+Estado implementado:
 
 - id: UserId
 - email: Email
@@ -61,28 +63,29 @@ FullName:
 
 ## Domain Events
 
-Evento planejado:
-
 ### UserRegistered
 
-Payload inicialmente planejado:
+UserRegistered é emitido quando um User é registrado de forma válida.
+
+Payload implementado:
 
 - user_id
 - email
 
-UserRegistered será implementado na próxima etapa da Feature 004.
+O evento preserva os metadados herdados do Shared Kernel:
+
+- event_id
+- occurred_at
 
 ## Criação do Aggregate
 
-A decisão planejada é utilizar uma factory semântica:
+A criação do Aggregate utiliza uma factory semântica:
 
 ```python
 User.register(...)
 ```
 
-A criação válida deverá registrar UserRegistered.
-
-Essa implementação ocorrerá na próxima etapa da Feature 004.
+A criação válida registra exatamente um UserRegistered.
 
 ## Invariantes
 
@@ -90,7 +93,7 @@ Essa implementação ocorrerá na próxima etapa da Feature 004.
 2. User sempre possui Email válido.
 3. User sempre possui FullName válido.
 4. A identidade do Aggregate não pode ser alterada.
-5. O registro válido de User deverá produzir UserRegistered.
+5. O registro válido de User produz UserRegistered.
 
 ## Alterações Futuras
 
@@ -141,8 +144,8 @@ Feature 004 — User Aggregate
 
 - [x] Domain Design
 - [x] Value Objects
-- [ ] User Aggregate
-- [ ] UserRegistered
+- [x] User Aggregate
+- [x] UserRegistered
 - [ ] Testes finais
 - [ ] Quality gates
 - [ ] Code Review

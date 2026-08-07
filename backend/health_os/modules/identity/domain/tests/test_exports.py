@@ -5,5 +5,7 @@ def test_identity_domain_exports_public_value_objects() -> None:
     assert domain.__all__ == [
         "Email",
         "FullName",
+        "User",
         "UserId",
+        "UserRegistered",
     ]
