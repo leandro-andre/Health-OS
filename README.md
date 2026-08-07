@@ -107,37 +107,29 @@ Healthy response:
 
 The health check verifies database connectivity and returns HTTP `503` when the database is unavailable. It does not expose sensitive infrastructure details.
 
-## Shared
+## Shared Kernel
 
-### Shared Domain
+The Shared Kernel contains small cross-module primitives without Django or DRF dependencies.
 
-Reusable domain primitives:
+Domain primitives:
 
-- `DomainEvent`
-- `Entity`
-- `DomainError`
+- `Entity`: typed identity, equality and hash based on concrete type plus identifier.
+- `AggregateRoot`: explicit `Entity` specialization that keeps domain event support.
+- `ValueObject`: immutable object with equality and hash by value.
+- `DomainEvent`: immutable event metadata with `event_id` and UTC `occurred_at`.
+- `DomainError`: base exception for domain errors.
 
-`Entity` stores, registers, clears, and pulls domain events without depending on Django, DRF, or infrastructure.
+Entities and aggregate roots accumulate domain events through `register_domain_event`, expose them as an immutable tuple, clear them with `clear_domain_events`, and atomically pull-and-clear them with `pull_domain_events`.
 
-### Event Bus
-
-The internal Event Bus is:
-
-- synchronous
-- in-memory
-- process-local
-- free of Celery, Redis, and RabbitMQ
-
-Contracts:
+Event Bus primitives:
 
 - `EventBus`
 - `EventHandler`
-
-Concrete implementation:
-
 - `InMemoryEventBus`
 
-Handlers run in registration order. Handler exceptions are propagated and stop the remaining handlers for that event publication.
+The internal Event Bus is synchronous, in-memory, process-local, and executes handlers in registration order. Publishing an event without handlers is a no-op; handler exceptions are propagated and stop later handlers.
+
+The absence of generic Repository, Unit of Work, CQRS abstractions, and external messaging is intentional at this stage.
 
 ## Installation
 

@@ -20,6 +20,9 @@ class ValueObject:
         object.__setattr__(self, name, value)
 
     def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ValueObject):
+            return False
+
         if type(self) is not type(other):
             return False
 

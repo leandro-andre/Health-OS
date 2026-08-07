@@ -19,6 +19,13 @@ def test_domain_does_not_import_drf() -> None:
     assert violations == []
 
 
+def test_domain_does_not_depend_on_application_or_infrastructure() -> None:
+    violations = _imports_containing(_layer_files("domain"), "application")
+    violations.extend(_imports_containing(_layer_files("domain"), "infrastructure"))
+
+    assert violations == []
+
+
 def test_application_does_not_import_presentation() -> None:
     violations = _imports_containing(_layer_files("application"), "presentation")
 

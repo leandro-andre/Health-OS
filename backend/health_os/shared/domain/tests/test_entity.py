@@ -103,6 +103,12 @@ def test_entity_can_be_used_in_set() -> None:
     assert len(entities) == 2
 
 
+def test_equal_entities_have_same_hash() -> None:
+    entity_id = uuid4()
+
+    assert hash(SampleEntity(entity_id)) == hash(SampleEntity(entity_id))
+
+
 def test_entity_can_be_used_as_dict_key() -> None:
     entity_id = uuid4()
     values = {
