@@ -67,6 +67,12 @@ def test_event_bus_ignores_handlers_registered_for_other_event_types() -> None:
     assert calls == []
 
 
+def test_event_bus_publishes_event_without_handlers() -> None:
+    event_bus = InMemoryEventBus()
+
+    event_bus.publish(UserRegistered())
+
+
 def test_event_bus_publishes_event_to_multiple_handlers() -> None:
     event_bus = InMemoryEventBus()
     calls: list[str] = []

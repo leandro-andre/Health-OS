@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 
-class SystemConfig(AppConfig):  # type: ignore[misc]
+class SystemConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "health_os.modules.system"
     label = "system"
