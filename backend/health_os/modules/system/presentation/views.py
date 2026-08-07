@@ -1,7 +1,9 @@
-from typing import ClassVar
+from collections.abc import Sequence
 
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import serializers, status
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,9 +12,9 @@ from health_os.modules.system.application.health_check import HealthCheckService
 from health_os.modules.system.infrastructure.database import DjangoDatabaseHealthChecker
 
 
-class HealthCheckAPIView(APIView):  # type: ignore[misc]
-    authentication_classes: ClassVar[list[type[object]]] = []
-    permission_classes: ClassVar[list[type[object]]] = []
+class HealthCheckAPIView(APIView):
+    authentication_classes: Sequence[type[BaseAuthentication]] = ()
+    permission_classes: Sequence[type[BasePermission]] = ()
 
     @extend_schema(
         operation_id="system_health_check",

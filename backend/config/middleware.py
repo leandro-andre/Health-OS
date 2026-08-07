@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import Any, cast
 from uuid import uuid4
 
 from django.conf import settings
@@ -15,7 +16,7 @@ class CorrelationIdMiddleware:
         header_name = settings.CORRELATION_ID_HEADER
         request_id = self._request_correlation_id(request, header_name)
         token = correlation_id.set(request_id)
-        request.correlation_id = request_id
+        cast(Any, request).correlation_id = request_id
 
         try:
             response = self._get_response(request)
