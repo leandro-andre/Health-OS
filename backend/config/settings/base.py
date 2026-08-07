@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "health_os.modules.system.apps.SystemConfig",
+    "health_os.modules.identity.apps.IdentityConfig",
 ]
 
 MIDDLEWARE = [
