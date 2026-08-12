@@ -98,6 +98,8 @@ def test_register_user_persists_valid_user() -> None:
     )
 
     assert output.user_id == user_id
+    assert output.email == "leo@example.com"
+    assert output.full_name == "Leandro Andre"
     assert len(repository.added_users) == 1
     assert repository.added_users[0].id == user_id
     assert repository.added_users[0].email == Email("leo@example.com")

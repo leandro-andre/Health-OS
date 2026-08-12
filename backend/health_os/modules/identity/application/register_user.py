@@ -23,6 +23,8 @@ class RegisterUserInput:
 @dataclass(frozen=True, slots=True)
 class RegisterUserOutput:
     user_id: UserId
+    email: str
+    full_name: str
 
 
 class RegisterUser:
@@ -54,4 +56,8 @@ class RegisterUser:
         for event in user.pull_domain_events():
             self._event_bus.publish(event)
 
-        return RegisterUserOutput(user_id=user.id)
+        return RegisterUserOutput(
+            user_id=user.id,
+            email=user.email.value,
+            full_name=user.full_name.value,
+        )

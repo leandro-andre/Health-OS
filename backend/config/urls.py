@@ -11,4 +11,5 @@ urlpatterns = [
         name="swagger-ui",
     ),
     path("api/v1/", include("health_os.modules.system.presentation.urls")),
+    path("api/v1/", include("health_os.modules.identity.presentation.urls")),
 ]
