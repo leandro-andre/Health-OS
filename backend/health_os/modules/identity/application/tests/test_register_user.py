@@ -3,11 +3,11 @@ from uuid import uuid4
 import pytest
 
 from health_os.modules.identity.application import (
+    CredentialRepository,
+    PasswordHasher,
     RegisterUser,
     RegisterUserInput,
     UserAlreadyExistsError,
-    CredentialRepository,
-    PasswordHasher,
     UserIdGenerator,
     UserRepository,
 )
@@ -86,19 +86,23 @@ class SpyCredentialRepository:
 
 
 class SpyPasswordHasher:
-    def __init__(self) -> None:
-        self.hash_calls: list[str] = []
-        self.should_fail = False
+    def __init__(self, operation_log: list[str] | None = None) -> None:
+        self.hashed_passwords: list[str] = []
+        self._operation_log = operation_log
+        self.should_fail_on_hash = False
 
     def hash(self, plain_password: str) -> str:
-        if self.should_fail:
-            raise RuntimeError("password hashing failed")
+        if self._operation_log is not None:
+            self._operation_log.append("password_hasher.hash")
 
-        self.hash_calls.append(plain_password)
-        return f"hashed:{plain_password}"
+        if self.should_fail_on_hash:
+            raise RuntimeError("hashing failed")
+
+        self.hashed_passwords.append(plain_password)
+        return f"hashed::{plain_password}"
 
     def verify(self, plain_password: str, password_hash: str) -> bool:
-        return password_hash == self.hash(plain_password)
+        return password_hash == f"hashed::{plain_password}"
 
 
 class SpyEventBus:
@@ -138,7 +142,7 @@ def test_register_user_persists_valid_user() -> None:
         RegisterUserInput(
             email="LEO@example.com",
             full_name="Leandro  Andre",
-            password="plain-password",
+            password="fake-secret",
         ),
     )
 
@@ -149,23 +153,76 @@ def test_register_user_persists_valid_user() -> None:
     assert repository.added_users[0].id == user_id
     assert repository.added_users[0].email == Email("leo@example.com")
     assert repository.added_users[0].full_name == FullName("Leandro Andre")
+    assert not hasattr(repository.added_users[0], "password")
+    assert not hasattr(repository.added_users[0], "password_hash")
+
+
+def test_register_user_persists_credential_hash_for_valid_user() -> None:
+    user_id = UserId(uuid4())
+    credential_repository = SpyCredentialRepository()
+    use_case = _use_case(
+        user_id=user_id,
+        credential_repository=credential_repository,
+    )
+
+    use_case.execute(
+        RegisterUserInput(
+            email="leo@example.com",
+            full_name="Leandro Andre",
+            password="fake-secret",
+        ),
+    )
+
+    assert credential_repository.added_credentials == [
+        (user_id, "hashed::fake-secret"),
+    ]
+
+
+def test_register_user_sends_password_to_password_hasher() -> None:
+    password_hasher = SpyPasswordHasher()
+    use_case = _use_case(password_hasher=password_hasher)
+
+    use_case.execute(
+        RegisterUserInput(
+            email="leo@example.com",
+            full_name="Leandro",
+            password="fake-secret",
+        ),
+    )
+
+    assert password_hasher.hashed_passwords == ["fake-secret"]
+
+
+def test_register_user_does_not_send_plain_password_to_credential_repository() -> None:
+    credential_repository = SpyCredentialRepository()
+    use_case = _use_case(credential_repository=credential_repository)
+
+    use_case.execute(
+        RegisterUserInput(
+            email="leo@example.com",
+            full_name="Leandro",
+            password="fake-secret",
+        ),
+    )
+
+    assert credential_repository.added_credentials[0][1] != "fake-secret"
 
 
 def test_register_user_generates_user_id() -> None:
     user_id_generator = StubUserIdGenerator(UserId(uuid4()))
     use_case = RegisterUser(
         user_repository=SpyUserRepository(),
-        user_id_generator=user_id_generator,
-        event_bus=SpyEventBus(),
-        password_hasher=SpyPasswordHasher(),
         credential_repository=SpyCredentialRepository(),
+        user_id_generator=user_id_generator,
+        password_hasher=SpyPasswordHasher(),
+        event_bus=SpyEventBus(),
     )
 
     use_case.execute(
         RegisterUserInput(
             email="leo@example.com",
             full_name="Leandro",
-            password="plain-password",
+            password="fake-secret",
         ),
     )
 
@@ -179,9 +236,16 @@ def test_register_user_publishes_user_registered_after_persistence() -> None:
     event_bus = SpyEventBus(operation_log)
     use_case = _use_case(user_id=user_id, repository=repository, event_bus=event_bus)
 
-    use_case.execute(_input())
+    use_case.execute(
+        RegisterUserInput(
+            email="leo@example.com",
+            full_name="Leandro",
+            password="fake-secret",
+        ),
+    )
 
     assert operation_log == [
+        "password_hasher.hash",
         "repository.add",
         "credential_repository.add",
         "event_bus.publish",
@@ -196,22 +260,22 @@ def test_register_user_publishes_user_registered_after_persistence() -> None:
 def test_register_user_does_not_publish_event_when_repository_add_fails() -> None:
     repository = SpyUserRepository()
     repository.should_fail_on_add = True
-    credential_repository = SpyCredentialRepository()
     event_bus = SpyEventBus()
-    use_case = _use_case(
-        repository=repository,
-        event_bus=event_bus,
-        credential_repository=credential_repository,
-    )
+    use_case = _use_case(repository=repository, event_bus=event_bus)
 
     with pytest.raises(RuntimeError, match="repository failed"):
-        use_case.execute(_input())
+        use_case.execute(
+            RegisterUserInput(
+                email="leo@example.com",
+                full_name="Leandro",
+                password="fake-secret",
+            ),
+        )
 
-    assert credential_repository.added_credentials == []
     assert event_bus.published_events == []
 
 
-def test_register_user_does_not_persist_or_publish_when_email_already_exists() -> None:
+def test_register_user_does_not_hash_persist_or_publish_when_email_exists() -> None:
     repository = SpyUserRepository()
     repository.add_existing(
         User.restore(
@@ -221,22 +285,103 @@ def test_register_user_does_not_persist_or_publish_when_email_already_exists() -
         ),
     )
     event_bus = SpyEventBus()
-
     user_id_generator = StubUserIdGenerator(UserId(uuid4()))
+    credential_repository = SpyCredentialRepository()
+    password_hasher = SpyPasswordHasher()
     use_case = RegisterUser(
         user_repository=repository,
+        credential_repository=credential_repository,
         user_id_generator=user_id_generator,
+        password_hasher=password_hasher,
         event_bus=event_bus,
-        password_hasher=SpyPasswordHasher(),
-        credential_repository=SpyCredentialRepository(),
     )
 
     with pytest.raises(UserAlreadyExistsError, match="User email already exists"):
-        use_case.execute(_input())
+        use_case.execute(
+            RegisterUserInput(
+                email="leo@example.com",
+                full_name="Leandro",
+                password="fake-secret",
+            ),
+        )
 
     assert repository.added_users == []
+    assert credential_repository.added_credentials == []
+    assert password_hasher.hashed_passwords == []
     assert event_bus.published_events == []
     assert user_id_generator.generate_calls == 0
+
+
+def test_register_user_does_not_persist_when_hashing_fails() -> None:
+    repository = SpyUserRepository()
+    credential_repository = SpyCredentialRepository()
+    event_bus = SpyEventBus()
+    password_hasher = SpyPasswordHasher()
+    password_hasher.should_fail_on_hash = True
+    use_case = _use_case(
+        repository=repository,
+        credential_repository=credential_repository,
+        password_hasher=password_hasher,
+        event_bus=event_bus,
+    )
+
+    with pytest.raises(RuntimeError, match="hashing failed"):
+        use_case.execute(
+            RegisterUserInput(
+                email="leo@example.com",
+                full_name="Leandro",
+                password="fake-secret",
+            ),
+        )
+
+    assert repository.added_users == []
+    assert credential_repository.added_credentials == []
+    assert event_bus.published_events == []
+
+
+def test_register_user_does_not_persist_credential_when_user_add_fails() -> None:
+    repository = SpyUserRepository()
+    repository.should_fail_on_add = True
+    credential_repository = SpyCredentialRepository()
+    event_bus = SpyEventBus()
+    use_case = _use_case(
+        repository=repository,
+        credential_repository=credential_repository,
+        event_bus=event_bus,
+    )
+
+    with pytest.raises(RuntimeError, match="repository failed"):
+        use_case.execute(
+            RegisterUserInput(
+                email="leo@example.com",
+                full_name="Leandro",
+                password="fake-secret",
+            ),
+        )
+
+    assert credential_repository.added_credentials == []
+    assert event_bus.published_events == []
+
+
+def test_register_user_does_not_publish_when_credential_add_fails() -> None:
+    credential_repository = SpyCredentialRepository()
+    credential_repository.should_fail_on_add = True
+    event_bus = SpyEventBus()
+    use_case = _use_case(
+        credential_repository=credential_repository,
+        event_bus=event_bus,
+    )
+
+    with pytest.raises(RuntimeError, match="credential repository failed"):
+        use_case.execute(
+            RegisterUserInput(
+                email="leo@example.com",
+                full_name="Leandro",
+                password="fake-secret",
+            ),
+        )
+
+    assert event_bus.published_events == []
 
 
 def test_register_user_propagates_event_bus_handler_exception() -> None:
@@ -245,7 +390,13 @@ def test_register_user_propagates_event_bus_handler_exception() -> None:
     use_case = _use_case(event_bus=event_bus)
 
     with pytest.raises(RuntimeError, match="handler failed"):
-        use_case.execute(_input())
+        use_case.execute(
+            RegisterUserInput(
+                email="leo@example.com",
+                full_name="Leandro",
+                password="fake-secret",
+            ),
+        )
 
 
 def test_register_user_clears_aggregate_events_after_successful_publication() -> None:
@@ -253,9 +404,30 @@ def test_register_user_clears_aggregate_events_after_successful_publication() ->
     event_bus = SpyEventBus()
     use_case = _use_case(repository=repository, event_bus=event_bus)
 
-    use_case.execute(_input())
+    use_case.execute(
+        RegisterUserInput(
+            email="leo@example.com",
+            full_name="Leandro",
+            password="fake-secret",
+        ),
+    )
 
     assert repository.added_users[0].domain_events == ()
+
+
+def test_register_user_output_does_not_contain_password_data() -> None:
+    use_case = _use_case()
+
+    output = use_case.execute(
+        RegisterUserInput(
+            email="leo@example.com",
+            full_name="Leandro",
+            password="fake-secret",
+        ),
+    )
+
+    assert not hasattr(output, "password")
+    assert not hasattr(output, "password_hash")
 
 
 def test_register_user_depends_on_event_bus_contract() -> None:
@@ -266,125 +438,36 @@ def test_register_user_depends_on_event_bus_contract() -> None:
     assert isinstance(use_case, RegisterUser)
 
 
-def test_register_user_hashes_password_and_persists_only_hash() -> None:
-    user_id = UserId(uuid4())
-    password_hasher = SpyPasswordHasher()
-    credential_repository = SpyCredentialRepository()
-    use_case = _use_case(
-        user_id=user_id,
-        password_hasher=password_hasher,
-        credential_repository=credential_repository,
-    )
+def test_register_user_depends_on_password_hasher_contract() -> None:
+    password_hasher: PasswordHasher = SpyPasswordHasher()
 
-    use_case.execute(_input(password="plain-password"))
+    use_case = _use_case(password_hasher=password_hasher)
 
-    assert password_hasher.hash_calls == ["plain-password"]
-    assert credential_repository.added_credentials == [
-        (user_id, "hashed:plain-password"),
-    ]
-    assert credential_repository.added_credentials[0][1] != "plain-password"
+    assert isinstance(use_case, RegisterUser)
 
 
-def test_register_user_aggregate_does_not_contain_password() -> None:
-    repository = SpyUserRepository()
-    use_case = _use_case(repository=repository)
+def test_register_user_depends_on_credential_repository_contract() -> None:
+    credential_repository: CredentialRepository = SpyCredentialRepository()
 
-    use_case.execute(_input(password="plain-password"))
+    use_case = _use_case(credential_repository=credential_repository)
 
-    user = repository.added_users[0]
-    assert not hasattr(user, "password")
-    assert not hasattr(user, "password_hash")
-
-
-def test_register_user_does_not_hash_or_persist_when_email_already_exists() -> None:
-    repository = SpyUserRepository()
-    repository.add_existing(
-        User.restore(
-            user_id=UserId(uuid4()),
-            email=Email("leo@example.com"),
-            full_name=FullName("Existing User"),
-        ),
-    )
-    password_hasher = SpyPasswordHasher()
-    credential_repository = SpyCredentialRepository()
-    event_bus = SpyEventBus()
-    user_id_generator = StubUserIdGenerator(UserId(uuid4()))
-    use_case = RegisterUser(
-        user_repository=repository,
-        user_id_generator=user_id_generator,
-        event_bus=event_bus,
-        password_hasher=password_hasher,
-        credential_repository=credential_repository,
-    )
-
-    with pytest.raises(UserAlreadyExistsError, match="User email already exists"):
-        use_case.execute(_input())
-
-    assert user_id_generator.generate_calls == 0
-    assert password_hasher.hash_calls == []
-    assert repository.added_users == []
-    assert credential_repository.added_credentials == []
-    assert event_bus.published_events == []
-
-
-def test_register_user_does_not_persist_or_publish_when_hashing_fails() -> None:
-    repository = SpyUserRepository()
-    password_hasher = SpyPasswordHasher()
-    password_hasher.should_fail = True
-    credential_repository = SpyCredentialRepository()
-    event_bus = SpyEventBus()
-    use_case = _use_case(
-        repository=repository,
-        password_hasher=password_hasher,
-        credential_repository=credential_repository,
-        event_bus=event_bus,
-    )
-
-    with pytest.raises(RuntimeError, match="password hashing failed"):
-        use_case.execute(_input())
-
-    assert repository.added_users == []
-    assert credential_repository.added_credentials == []
-    assert event_bus.published_events == []
-
-
-def test_register_user_does_not_publish_when_credential_repository_fails() -> None:
-    credential_repository = SpyCredentialRepository()
-    credential_repository.should_fail_on_add = True
-    event_bus = SpyEventBus()
-    use_case = _use_case(
-        credential_repository=credential_repository,
-        event_bus=event_bus,
-    )
-
-    with pytest.raises(RuntimeError, match="credential repository failed"):
-        use_case.execute(_input())
-
-    assert event_bus.published_events == []
+    assert isinstance(use_case, RegisterUser)
 
 
 def _use_case(
     *,
     user_id: UserId | None = None,
     repository: UserRepository | None = None,
-    event_bus: EventBus | None = None,
-    password_hasher: PasswordHasher | None = None,
     credential_repository: CredentialRepository | None = None,
+    password_hasher: PasswordHasher | None = None,
+    event_bus: EventBus | None = None,
 ) -> RegisterUser:
     generated_user_id = user_id or UserId(uuid4())
     user_id_generator: UserIdGenerator = StubUserIdGenerator(generated_user_id)
     return RegisterUser(
         user_repository=repository or SpyUserRepository(),
-        user_id_generator=user_id_generator,
-        event_bus=event_bus or SpyEventBus(),
-        password_hasher=password_hasher or SpyPasswordHasher(),
         credential_repository=credential_repository or SpyCredentialRepository(),
-    )
-
-
-def _input(*, password: str = "plain-password") -> RegisterUserInput:
-    return RegisterUserInput(
-        email="leo@example.com",
-        full_name="Leandro",
-        password=password,
+        user_id_generator=user_id_generator,
+        password_hasher=password_hasher or SpyPasswordHasher(),
+        event_bus=event_bus or SpyEventBus(),
     )

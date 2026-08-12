@@ -18,43 +18,44 @@ class PasswordHasher(Protocol):
 
 Infrastructure fornece DjangoPasswordHasher, baseado nas APIs oficiais de password hashing do Django.
 
+Hashing acontece antes da persistencia da credencial. CredentialRepository nao executa hashing.
+
 ## Credenciais
 
 CredentialRepository e o contrato da Application para persistir e recuperar password_hash por UserId.
 
-Infrastructure implementa esse contrato com DjangoCredentialRepository e persiste apenas password_hash em Credential separada, associada a UserId.
+Infrastructure implementa esse contrato com DjangoCredentialRepository.
 
-Um User possui no maximo uma credencial de senha.
+Credenciais sao persistidas separadamente de User:
 
-## Cadastro
-
-RegisterUser recebe password como entrada, gera password_hash com PasswordHasher, persiste User, persiste Credential e somente depois publica Domain Events.
-
-Senha em texto puro nunca e persistida. A API de cadastro nunca retorna password ou password_hash.
+- associacao por UserId;
+- banco armazena somente password_hash;
+- um User possui no maximo uma credencial de senha;
+- CredentialModel e detalhe de Infrastructure.
 
 ## Seguranca
 
 - plain password nunca deve ser persistida;
 - plain password nao deve aparecer em logs;
-- hash de senha nao e reversivel;
-- comparacao usa API segura da infraestrutura;
+- nomes de campos deixam claro que armazenam hash;
+- repository nao expoe objeto Django para Application;
 - nenhum algoritmo criptografico proprio foi implementado.
 
 ## Fora Do Escopo
 
+- alteracao do POST /users/;
+- password no RegisterUser;
 - login;
 - JWT;
-- access token;
 - refresh token;
 - logout;
-- password reset;
-- change password;
+- recuperacao de senha;
+- troca de senha;
+- MFA;
 - OAuth;
 - social login;
-- MFA;
-- email verification;
-- politica avancada de senha;
-- Outbox;
-- Unit of Work.
+- multiplos credential providers;
+- sessao;
+- permissions.
 
-Login e tokens ainda nao estao implementados. JWT e tokens pertencem a Feature 009.
+Login ainda nao esta implementado.

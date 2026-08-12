@@ -15,18 +15,16 @@ POST /api/v1/users/
 ```json
 {
   "email": "leo@example.com",
-  "full_name": "Leandro Andre",
-  "password": "senha-do-usuario"
+  "full_name": "Leandro Andre"
 }
 ```
 
 Campos:
 
 - email: e-mail recebido pela API;
-- full_name: nome completo recebido pela API;
-- password: senha recebida apenas como entrada.
+- full_name: nome completo recebido pela API.
 
-Password e write-only. O serializer valida apenas estrutura HTTP basica e nao duplica regras de dominio ou politica complexa de senha.
+Password ainda nao faz parte do endpoint de cadastro nesta etapa.
 
 ## Response De Sucesso
 
@@ -48,7 +46,7 @@ Body:
 
 Os valores retornados refletem a normalizacao realizada pelo dominio.
 
-A resposta nunca expoe password ou password_hash.
+A resposta nao expoe User Aggregate, UserModel, Domain Events ou objetos de Infrastructure.
 
 ## Erros
 
@@ -88,30 +86,9 @@ E-mail ja cadastrado:
 
 A view implementada valida o payload, converte para RegisterUserInput, executa RegisterUser, monta a resposta com RegisterUserResponseSerializer e retorna 201 Created.
 
-## Composition Root
-
-Presentation compoe:
-
-```python
-RegisterUser(
-    user_repository=DjangoUserRepository(),
-    user_id_generator=UUIDUserIdGenerator(),
-    event_bus=InMemoryEventBus(),
-    password_hasher=DjangoPasswordHasher(),
-    credential_repository=DjangoCredentialRepository(),
-)
-```
-
-## Segurança
-
-- senha em texto puro nunca e persistida;
-- password_hash e persistido em Credential separada;
-- User Aggregate nao contem senha;
-- API nao retorna password;
-- API nao retorna password_hash.
-
 ## Fora Do Escopo
 
+- password no cadastro;
 - login;
 - JWT;
 - access token;

@@ -15,7 +15,6 @@ def test_register_user_request_serializer_accepts_valid_payload() -> None:
         data={
             "email": "leo@example.com",
             "full_name": "Leandro Andre",
-            "password": "plain-password",
         },
     )
 
@@ -26,7 +25,6 @@ def test_register_user_request_serializer_rejects_missing_email() -> None:
     serializer = RegisterUserRequestSerializer(
         data={
             "full_name": "Leandro Andre",
-            "password": "plain-password",
         },
     )
 
@@ -38,7 +36,6 @@ def test_register_user_request_serializer_rejects_missing_full_name() -> None:
     serializer = RegisterUserRequestSerializer(
         data={
             "email": "leo@example.com",
-            "password": "plain-password",
         },
     )
 
@@ -51,7 +48,6 @@ def test_register_user_request_serializer_produces_register_user_input() -> None
         data={
             "email": "LEO@example.com",
             "full_name": "Leandro  Andre",
-            "password": "plain-password",
         },
     )
 
@@ -62,20 +58,7 @@ def test_register_user_request_serializer_produces_register_user_input() -> None
     assert input_data == RegisterUserInput(
         email="LEO@example.com",
         full_name="Leandro  Andre",
-        password="plain-password",
     )
-
-
-def test_register_user_request_serializer_rejects_missing_password() -> None:
-    serializer = RegisterUserRequestSerializer(
-        data={
-            "email": "leo@example.com",
-            "full_name": "Leandro Andre",
-        },
-    )
-
-    assert not serializer.is_valid()
-    assert "password" in serializer.errors
 
 
 def test_response_serializer_does_not_leak_domain_or_infrastructure() -> None:

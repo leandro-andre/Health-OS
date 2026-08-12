@@ -13,8 +13,8 @@ from health_os.shared.infrastructure import InMemoryEventBus
 def build_register_user() -> RegisterUser:
     return RegisterUser(
         user_repository=DjangoUserRepository(),
-        user_id_generator=UUIDUserIdGenerator(),
-        event_bus=InMemoryEventBus(),
-        password_hasher=DjangoPasswordHasher(),
         credential_repository=DjangoCredentialRepository(),
+        user_id_generator=UUIDUserIdGenerator(),
+        password_hasher=DjangoPasswordHasher(),
+        event_bus=InMemoryEventBus(),
     )

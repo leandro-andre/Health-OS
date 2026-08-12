@@ -36,16 +36,16 @@ class RegisterUser:
     def __init__(
         self,
         user_repository: UserRepository,
-        user_id_generator: UserIdGenerator,
-        event_bus: EventBus,
-        password_hasher: PasswordHasher,
         credential_repository: CredentialRepository,
+        user_id_generator: UserIdGenerator,
+        password_hasher: PasswordHasher,
+        event_bus: EventBus,
     ) -> None:
         self._user_repository = user_repository
-        self._user_id_generator = user_id_generator
-        self._event_bus = event_bus
-        self._password_hasher = password_hasher
         self._credential_repository = credential_repository
+        self._user_id_generator = user_id_generator
+        self._password_hasher = password_hasher
+        self._event_bus = event_bus
 
     def execute(self, input_data: RegisterUserInput) -> RegisterUserOutput:
         email = Email(input_data.email)
@@ -62,10 +62,7 @@ class RegisterUser:
         password_hash = self._password_hasher.hash(input_data.password)
 
         self._user_repository.add(user)
-        self._credential_repository.add(
-            user_id=user.id,
-            password_hash=password_hash,
-        )
+        self._credential_repository.add(user.id, password_hash)
 
         for event in user.pull_domain_events():
             self._event_bus.publish(event)
