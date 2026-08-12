@@ -115,6 +115,14 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 CORRELATION_ID_HEADER = "X-Correlation-ID"
 
+JWT_SIGNING_KEY = env("JWT_SIGNING_KEY", default=SECRET_KEY)
+JWT_ALGORITHM = env("JWT_ALGORITHM", default="HS256")
+JWT_ACCESS_TOKEN_SECONDS = env.int("JWT_ACCESS_TOKEN_SECONDS", default=15 * 60)
+JWT_REFRESH_TOKEN_SECONDS = env.int(
+    "JWT_REFRESH_TOKEN_SECONDS",
+    default=7 * 24 * 60 * 60,
+)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

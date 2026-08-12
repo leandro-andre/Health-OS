@@ -233,8 +233,16 @@ def test_register_user_publishes_user_registered_after_persistence() -> None:
     user_id = UserId(uuid4())
     operation_log: list[str] = []
     repository = SpyUserRepository(operation_log)
+    credential_repository = SpyCredentialRepository(operation_log)
+    password_hasher = SpyPasswordHasher(operation_log)
     event_bus = SpyEventBus(operation_log)
-    use_case = _use_case(user_id=user_id, repository=repository, event_bus=event_bus)
+    use_case = _use_case(
+        user_id=user_id,
+        repository=repository,
+        credential_repository=credential_repository,
+        password_hasher=password_hasher,
+        event_bus=event_bus,
+    )
 
     use_case.execute(
         RegisterUserInput(

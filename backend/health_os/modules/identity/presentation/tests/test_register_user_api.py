@@ -3,7 +3,8 @@ from uuid import UUID
 import pytest
 from rest_framework.test import APIClient
 
-from health_os.modules.identity.infrastructure.models import UserModel
+from health_os.modules.identity.infrastructure import DjangoPasswordHasher
+from health_os.modules.identity.infrastructure.models import CredentialModel, UserModel
 from health_os.shared.domain import DomainError
 
 pytestmark = pytest.mark.django_db
@@ -17,6 +18,7 @@ def test_post_register_user_returns_201_with_user_data() -> None:
         data={
             "email": "LEO@example.com",
             "full_name": " Leandro  Andre ",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -27,6 +29,8 @@ def test_post_register_user_returns_201_with_user_data() -> None:
     assert UUID(response_data["user_id"])
     assert response_data["email"] == "leo@example.com"
     assert response_data["full_name"] == "Leandro Andre"
+    assert "password" not in response_data
+    assert "password_hash" not in response_data
 
 
 def test_post_register_user_persists_user() -> None:
@@ -37,6 +41,7 @@ def test_post_register_user_persists_user() -> None:
         data={
             "email": "leo@example.com",
             "full_name": "Leandro Andre",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -53,6 +58,7 @@ def test_post_register_user_persists_normalized_user_data() -> None:
         data={
             "email": "LEO@example.com",
             "full_name": " Leandro  Andre ",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -63,6 +69,28 @@ def test_post_register_user_persists_normalized_user_data() -> None:
     assert model.full_name == "Leandro Andre"
 
 
+def test_post_register_user_persists_credential_hash() -> None:
+    client = APIClient()
+    plain_password = "fake-secret"
+
+    response = client.post(
+        "/api/v1/users/",
+        data={
+            "email": "leo@example.com",
+            "full_name": "Leandro Andre",
+            "password": plain_password,
+        },
+        format="json",
+    )
+
+    credential = CredentialModel.objects.get(user_id=response.json()["user_id"])
+
+    assert response.status_code == 201
+    assert credential.password_hash != plain_password
+    assert DjangoPasswordHasher().verify(plain_password, credential.password_hash)
+    assert not DjangoPasswordHasher().verify("wrong-secret", credential.password_hash)
+
+
 def test_post_register_user_without_email_returns_400() -> None:
     client = APIClient()
 
@@ -70,6 +98,7 @@ def test_post_register_user_without_email_returns_400() -> None:
         "/api/v1/users/",
         data={
             "full_name": "Leandro Andre",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -84,6 +113,7 @@ def test_post_register_user_without_full_name_returns_400() -> None:
         "/api/v1/users/",
         data={
             "email": "leo@example.com",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -99,6 +129,7 @@ def test_post_register_user_with_invalid_email_returns_400() -> None:
         data={
             "email": "not-an-email",
             "full_name": "Leandro Andre",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -114,6 +145,22 @@ def test_post_register_user_with_invalid_full_name_returns_400() -> None:
         data={
             "email": "leo@example.com",
             "full_name": "",
+            "password": "fake-secret",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+
+
+def test_post_register_user_without_password_returns_400() -> None:
+    client = APIClient()
+
+    response = client.post(
+        "/api/v1/users/",
+        data={
+            "email": "leo@example.com",
+            "full_name": "Leandro Andre",
         },
         format="json",
     )
@@ -139,6 +186,7 @@ def test_post_register_user_with_domain_error_returns_400(
         data={
             "email": "leo@example.com",
             "full_name": "Leandro Andre",
+            "password": "fake-secret",
         },
         format="json",
     )
@@ -157,6 +205,7 @@ def test_post_register_user_with_existing_email_returns_409() -> None:
     payload = {
         "email": "leo@example.com",
         "full_name": "Leandro Andre",
+        "password": "fake-secret",
     }
 
     first_response = client.post("/api/v1/users/", data=payload, format="json")
@@ -177,12 +226,14 @@ def test_post_register_user_with_existing_email_does_not_create_another_user() -
     payload = {
         "email": "leo@example.com",
         "full_name": "Leandro Andre",
+        "password": "fake-secret",
     }
 
     client.post("/api/v1/users/", data=payload, format="json")
     client.post("/api/v1/users/", data=payload, format="json")
 
     assert UserModel.objects.count() == 1
+    assert CredentialModel.objects.count() == 1
 
 
 def test_register_user_route_exists_at_expected_url() -> None:
