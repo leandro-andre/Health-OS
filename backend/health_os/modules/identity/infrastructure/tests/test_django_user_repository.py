@@ -90,6 +90,29 @@ def test_duplicate_email_is_rejected_by_database_constraint() -> None:
         repository.add(_user(email="leo@example.com", full_name="Another User"))
 
 
+def test_add_with_existing_id_is_rejected_without_updating_user() -> None:
+    user_id = UserId(uuid4())
+    original_user = User.restore(
+        user_id=user_id,
+        email=Email("original@example.com"),
+        full_name=FullName("Original User"),
+    )
+    duplicate_id_user = User.restore(
+        user_id=user_id,
+        email=Email("updated@example.com"),
+        full_name=FullName("Updated User"),
+    )
+    repository = DjangoUserRepository()
+    repository.add(original_user)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        repository.add(duplicate_id_user)
+
+    model = UserModel.objects.get(id=user_id.value)
+    assert model.email == "original@example.com"
+    assert model.full_name == "Original User"
+
+
 def _user(*, email: str, full_name: str) -> User:
     return User.restore(
         user_id=UserId(uuid4()),

@@ -6,12 +6,10 @@ from health_os.modules.identity.infrastructure.user_mapper import UserMapper
 
 class DjangoUserRepository(UserRepository):
     def add(self, user: User) -> None:
-        UserModel.objects.update_or_create(
+        UserModel.objects.create(
             id=user.id.value,
-            defaults={
-                "email": user.email.value,
-                "full_name": user.full_name.value,
-            },
+            email=user.email.value,
+            full_name=user.full_name.value,
         )
 
     def get_by_id(self, user_id: UserId) -> User | None:

@@ -177,5 +177,5 @@ Feature 005 - User Repository & Persistence
 - [x] DjangoUserRepository
 - [x] Migration inicial
 - [x] Testes de integracao
-- [ ] Quality gates
-- [ ] Code Review
+- [x] Quality gates
+- [x] Code Review
