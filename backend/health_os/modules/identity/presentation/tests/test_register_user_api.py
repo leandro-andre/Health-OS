@@ -3,7 +3,8 @@ from uuid import UUID
 import pytest
 from rest_framework.test import APIClient
 
-from health_os.modules.identity.infrastructure.models import UserModel
+from health_os.modules.identity.infrastructure import DjangoPasswordHasher
+from health_os.modules.identity.infrastructure.models import CredentialModel, UserModel
 from health_os.shared.domain import DomainError
 
 pytestmark = pytest.mark.django_db
@@ -17,6 +18,7 @@ def test_post_register_user_returns_201_with_user_data() -> None:
         data={
             "email": "LEO@example.com",
             "full_name": " Leandro  Andre ",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -27,6 +29,8 @@ def test_post_register_user_returns_201_with_user_data() -> None:
     assert UUID(response_data["user_id"])
     assert response_data["email"] == "leo@example.com"
     assert response_data["full_name"] == "Leandro Andre"
+    assert "password" not in response_data
+    assert "password_hash" not in response_data
 
 
 def test_post_register_user_persists_user() -> None:
@@ -37,6 +41,7 @@ def test_post_register_user_persists_user() -> None:
         data={
             "email": "leo@example.com",
             "full_name": "Leandro Andre",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -53,6 +58,7 @@ def test_post_register_user_persists_normalized_user_data() -> None:
         data={
             "email": "LEO@example.com",
             "full_name": " Leandro  Andre ",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -63,6 +69,25 @@ def test_post_register_user_persists_normalized_user_data() -> None:
     assert model.full_name == "Leandro Andre"
 
 
+def test_post_register_user_persists_credential_hash() -> None:
+    client = APIClient()
+
+    response = client.post(
+        "/api/v1/users/",
+        data={
+            "email": "leo@example.com",
+            "full_name": "Leandro Andre",
+            "password": "plain-password",
+        },
+        format="json",
+    )
+
+    credential = CredentialModel.objects.get(user_id=response.json()["user_id"])
+
+    assert credential.password_hash != "plain-password"
+    assert DjangoPasswordHasher().verify("plain-password", credential.password_hash)
+
+
 def test_post_register_user_without_email_returns_400() -> None:
     client = APIClient()
 
@@ -70,6 +95,7 @@ def test_post_register_user_without_email_returns_400() -> None:
         "/api/v1/users/",
         data={
             "full_name": "Leandro Andre",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -84,6 +110,7 @@ def test_post_register_user_without_full_name_returns_400() -> None:
         "/api/v1/users/",
         data={
             "email": "leo@example.com",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -99,6 +126,7 @@ def test_post_register_user_with_invalid_email_returns_400() -> None:
         data={
             "email": "not-an-email",
             "full_name": "Leandro Andre",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -114,6 +142,7 @@ def test_post_register_user_with_invalid_full_name_returns_400() -> None:
         data={
             "email": "leo@example.com",
             "full_name": "",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -139,6 +168,7 @@ def test_post_register_user_with_domain_error_returns_400(
         data={
             "email": "leo@example.com",
             "full_name": "Leandro Andre",
+            "password": "plain-password",
         },
         format="json",
     )
@@ -157,6 +187,7 @@ def test_post_register_user_with_existing_email_returns_409() -> None:
     payload = {
         "email": "leo@example.com",
         "full_name": "Leandro Andre",
+        "password": "plain-password",
     }
 
     first_response = client.post("/api/v1/users/", data=payload, format="json")
@@ -177,12 +208,29 @@ def test_post_register_user_with_existing_email_does_not_create_another_user() -
     payload = {
         "email": "leo@example.com",
         "full_name": "Leandro Andre",
+        "password": "plain-password",
     }
 
     client.post("/api/v1/users/", data=payload, format="json")
     client.post("/api/v1/users/", data=payload, format="json")
 
     assert UserModel.objects.count() == 1
+    assert CredentialModel.objects.count() == 1
+
+
+def test_post_register_user_without_password_returns_400() -> None:
+    client = APIClient()
+
+    response = client.post(
+        "/api/v1/users/",
+        data={
+            "email": "leo@example.com",
+            "full_name": "Leandro Andre",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
 
 
 def test_register_user_route_exists_at_expected_url() -> None:
@@ -213,3 +261,30 @@ def test_openapi_schema_documents_register_user_operation() -> None:
     assert "201" in post_operation["responses"]
     assert "400" in post_operation["responses"]
     assert "409" in post_operation["responses"]
+
+
+def test_openapi_schema_documents_password_as_input_only() -> None:
+    client = APIClient()
+
+    response = client.get("/api/v1/schema/", HTTP_ACCEPT="application/json")
+
+    assert response.status_code == 200
+    schema = response.json()
+    request_schema_name = schema["paths"]["/api/v1/users/"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]["$ref"].rsplit("/", maxsplit=1)[-1]
+    response_schema_name = schema["paths"]["/api/v1/users/"]["post"]["responses"][
+        "201"
+    ]["content"]["application/json"]["schema"]["$ref"].rsplit("/", maxsplit=1)[-1]
+
+    request_properties = schema["components"]["schemas"][request_schema_name][
+        "properties"
+    ]
+    response_properties = schema["components"]["schemas"][response_schema_name][
+        "properties"
+    ]
+
+    assert "password" in request_properties
+    assert request_properties["password"]["writeOnly"] is True
+    assert "password" not in response_properties
+    assert "password_hash" not in response_properties

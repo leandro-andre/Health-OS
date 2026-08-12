@@ -2,7 +2,7 @@
 
 ## Status
 
-Endpoint HTTP implementado na Feature 007.
+Endpoint HTTP implementado.
 
 ## Metodo E URL
 
@@ -15,16 +15,18 @@ POST /api/v1/users/
 ```json
 {
   "email": "leo@example.com",
-  "full_name": "Leandro Andre"
+  "full_name": "Leandro Andre",
+  "password": "senha-do-usuario"
 }
 ```
 
 Campos:
 
 - email: e-mail recebido pela API;
-- full_name: nome completo recebido pela API.
+- full_name: nome completo recebido pela API;
+- password: senha recebida apenas como entrada.
 
-O serializer de entrada valida apenas a estrutura HTTP basica e produz RegisterUserInput. Ele nao duplica regras de dominio.
+Password e write-only. O serializer valida apenas estrutura HTTP basica e nao duplica regras de dominio ou politica complexa de senha.
 
 ## Response De Sucesso
 
@@ -44,9 +46,9 @@ Body:
 }
 ```
 
-A representacao de resposta e preparada na Presentation e nao expoe User Aggregate, UserModel, Domain Events ou objetos de Infrastructure.
-
 Os valores retornados refletem a normalizacao realizada pelo dominio.
+
+A resposta nunca expoe password ou password_hash.
 
 ## Erros
 
@@ -84,52 +86,43 @@ E-mail ja cadastrado:
 
 ## Relacao Com RegisterUser
 
-A view implementada:
-
-1. validar o payload com RegisterUserRequestSerializer;
-2. converter o payload valido para RegisterUserInput;
-3. executar RegisterUser;
-4. montar a resposta com RegisterUserResponseSerializer usando RegisterUserOutput;
-5. retornar 201 Created.
+A view implementada valida o payload, converte para RegisterUserInput, executa RegisterUser, monta a resposta com RegisterUserResponseSerializer e retorna 201 Created.
 
 ## Composition Root
 
-A Presentation possui uma factory explicita para compor:
+Presentation compoe:
 
 ```python
 RegisterUser(
     user_repository=DjangoUserRepository(),
     user_id_generator=UUIDUserIdGenerator(),
     event_bus=InMemoryEventBus(),
+    password_hasher=DjangoPasswordHasher(),
+    credential_repository=DjangoCredentialRepository(),
 )
 ```
 
-Essa composicao fica na borda da aplicacao. O caso de uso continua dependendo apenas de contratos.
+## Segurança
 
-## Responsabilidades
-
-Presentation:
-
-- receber e validar a estrutura HTTP basica;
-- converter dados para RegisterUserInput;
-- compor implementacoes concretas;
-- preparar a representacao HTTP planejada.
-
-Domain:
-
-- normalizar e validar Email;
-- normalizar e validar FullName;
-- proteger invariantes do User;
-- criar UserRegistered durante User.register(...).
+- senha em texto puro nunca e persistida;
+- password_hash e persistido em Credential separada;
+- User Aggregate nao contem senha;
+- API nao retorna password;
+- API nao retorna password_hash.
 
 ## Fora Do Escopo
 
-- autenticacao;
-- senha;
-- JWT;
-- OAuth;
 - login;
-- throttling;
-- permissions;
-- envio de e-mail;
-- handlers de UserRegistered.
+- JWT;
+- access token;
+- refresh token;
+- logout;
+- password reset;
+- change password;
+- OAuth;
+- social login;
+- MFA;
+- email verification;
+- politica avancada de senha;
+- Outbox;
+- Unit of Work.

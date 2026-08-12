@@ -15,3 +15,16 @@ class UserModel(models.Model):
 
     class Meta:
         db_table = "identity_user"
+
+
+class CredentialModel(models.Model):
+    user: models.OneToOneField[UserModel, UserModel] = models.OneToOneField(
+        UserModel,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="credential",
+    )
+    password_hash: models.CharField[str, str] = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = "identity_credential"

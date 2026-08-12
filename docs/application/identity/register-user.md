@@ -2,26 +2,29 @@
 
 ## Objetivo
 
-RegisterUser e o caso de uso da camada application responsavel por orquestrar o registro de um novo User no bounded context Identity.
+RegisterUser orquestra o cadastro de um novo User no bounded context Identity.
 
-Ele nao implementa regras de infraestrutura, nao usa Django ORM, nao conhece handlers concretos de eventos e nao envolve HTTP nesta Feature.
+Ele nao implementa regras de infraestrutura, nao usa Django ORM e nao conhece handlers concretos de eventos.
 
 ## Input
 
-RegisterUserInput contem apenas dados primitivos apropriados para entrada do caso de uso:
+RegisterUserInput contem:
 
 - email: str
 - full_name: str
+- password: str
 
-O UserId nao e fornecido pelo cliente. Ele e gerado pelo caso de uso atraves de uma dependencia explicita.
+UserId nao e fornecido pelo cliente. A senha existe somente durante a execucao do caso de uso e nunca e enviada ao User Aggregate.
 
 ## Output
 
 RegisterUserOutput retorna:
 
 - user_id: UserId
+- email: str
+- full_name: str
 
-O output nao expoe User Aggregate, Django Model, Event Bus concreto ou qualquer objeto de infraestrutura.
+O output nao expoe User Aggregate, Django Model, credencial, senha, password_hash, Event Bus concreto ou objeto de infraestrutura.
 
 ## Dependencias
 
@@ -29,100 +32,77 @@ RegisterUser recebe explicitamente:
 
 - UserRepository;
 - UserIdGenerator;
-- EventBus.
+- EventBus;
+- PasswordHasher;
+- CredentialRepository.
 
-UserRepository e o contrato de persistencia da camada application.
-
-UserIdGenerator e um contrato pequeno e testavel para gerar UserId. Implementacoes concretas permanecem fora do dominio.
-
-EventBus e o contrato da camada shared application. A implementacao concreta atual e sincrona, process-local e in-memory, mas permanece fora da camada application.
+Application depende apenas desses contratos.
 
 ## Fluxo
 
-1. Validar Email e FullName criando os Value Objects.
+1. Validar Email e FullName criando Value Objects.
 2. Verificar se ja existe User com o e-mail informado.
 3. Gerar UserId.
 4. Criar o Aggregate com User.register(...).
-5. Persistir User via UserRepository.add(user).
-6. Publicar os Domain Events produzidos pelo Aggregate.
-7. Retornar RegisterUserOutput.
+5. Gerar password_hash com PasswordHasher.
+6. Persistir User via UserRepository.add(user).
+7. Persistir credencial via CredentialRepository.add(user.id, password_hash).
+8. Publicar os Domain Events produzidos pelo Aggregate.
+9. Retornar RegisterUserOutput.
 
 ## Email Existente
 
 Email continua responsavel apenas por validade e normalizacao do valor.
 
-RegisterUser consulta UserRepository.get_by_email(...) depois de criar o Value Object Email. Se ja existir User para o e-mail normalizado, o caso de uso levanta UserAlreadyExistsError.
+Se ja existir User para o e-mail normalizado, RegisterUser levanta UserAlreadyExistsError.
 
 Nesse cenario:
 
 - UserId nao e gerado;
+- senha nao e enviada ao PasswordHasher;
 - UserRepository.add(...) nao e chamado;
+- CredentialRepository.add(...) nao e chamado;
 - nenhum Domain Event e publicado.
 
-A constraint unica do banco continua sendo a ultima linha de defesa contra duplicidade.
+## Persistencia E Credenciais
 
-## Persistencia
+RegisterUser persiste o User e, separadamente, a credencial associada ao UserId.
 
-Persistencia acontece antes da publicacao dos eventos.
+Senha em texto puro nunca e persistida. Apenas password_hash e enviado ao CredentialRepository.
 
-RegisterUser persiste o Aggregate com UserRepository.add(user). A implementacao concreta pode usar Django ORM, mas isso e detalhe de infraestrutura.
+User Aggregate permanece sem senha e sem hash.
 
 ## Domain Events
 
 UserRegistered nasce no dominio durante User.register(...).
 
-RegisterUser nao instancia UserRegistered diretamente e nao conhece detalhes especificos desse evento. O caso de uso apenas publica os eventos pendentes produzidos pelo Aggregate, preservando a ordem em que foram registrados.
+RegisterUser nao instancia UserRegistered diretamente. Eventos sao publicados somente depois que User e Credential foram persistidos.
 
 Depois de uma publicacao bem-sucedida, os eventos pendentes sao removidos do Aggregate usando a API publica do Shared Kernel.
 
 ## Falhas
 
-Se UserRepository.add(user) falhar, nenhum evento e publicado.
+Se PasswordHasher falhar, nada e persistido e nenhum evento e publicado.
 
-Se um handler do Event Bus falhar, a excecao e propagada ao chamador. Nao ha retry, compensacao, fila, Outbox ou Unit of Work nesta Feature.
+Se UserRepository.add(user) falhar, credencial nao e persistida e nenhum evento e publicado.
 
-Persistencia e publicacao ainda nao possuem garantia transacional distribuida ou atomica.
+Se CredentialRepository.add(...) falhar, nenhum evento e publicado e a excecao e propagada.
 
-## Limitacoes Atuais
-
-- Event Bus e sincrono e process-local;
-- persistencia e publicacao nao possuem Outbox;
-- HTTP ainda nao faz parte desta Feature;
-- nao ha handler real de UserRegistered nesta Feature.
+Persistencia de User e Credential ainda nao esta protegida por Unit of Work.
 
 ## Fora Do Escopo
 
-- HTTP;
-- serializer;
-- endpoint;
-- autenticacao;
-- senha;
-- JWT;
-- OAuth;
 - login;
-- confirmacao de email;
-- envio de e-mail;
-- handler real de UserRegistered;
+- JWT;
+- access token;
+- refresh token;
+- logout;
+- password reset;
+- change password;
+- OAuth;
+- social login;
+- MFA;
+- email verification;
+- politica avancada de senha;
 - Outbox;
-- Unit of Work;
-- retry;
-- filas;
-- alteracao de User.
-
-## Status Da Feature
-
-Feature 006 - Register User Use Case
-
-- [x] RegisterUserInput
-- [x] RegisterUserOutput
-- [x] UserIdGenerator
-- [x] UserAlreadyExistsError
-- [x] verificacao de e-mail existente
-- [x] criacao do User Aggregate
-- [x] persistencia via UserRepository
-- [x] publicacao de Domain Events via EventBus
-- [x] limpeza de eventos apos publicacao bem-sucedida
-- [x] teste unitario
-- [x] teste integrado minimo
-- [x] Quality gates
-- [x] Code Review
+- Unit of Work.

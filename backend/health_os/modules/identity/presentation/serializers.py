@@ -8,11 +8,16 @@ from health_os.modules.identity.application import RegisterUserInput, RegisterUs
 class RegisterUserRequestSerializer(serializers.Serializer[Any]):
     email: serializers.EmailField = serializers.EmailField()
     full_name: serializers.CharField = serializers.CharField()
+    password: serializers.CharField = serializers.CharField(
+        trim_whitespace=False,
+        write_only=True,
+    )
 
     def to_register_user_input(self) -> RegisterUserInput:
         return RegisterUserInput(
             email=str(self.validated_data["email"]),
             full_name=str(self.validated_data["full_name"]),
+            password=str(self.validated_data["password"]),
         )
 
 

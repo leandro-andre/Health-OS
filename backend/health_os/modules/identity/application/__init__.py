@@ -1,3 +1,7 @@
+from health_os.modules.identity.application.credential_repository import (
+    CredentialRepository,
+)
+from health_os.modules.identity.application.password_hasher import PasswordHasher
 from health_os.modules.identity.application.register_user import (
     RegisterUser,
     RegisterUserInput,
@@ -8,6 +12,8 @@ from health_os.modules.identity.application.register_user import (
 from health_os.modules.identity.application.user_repository import UserRepository
 
 __all__ = [
+    "CredentialRepository",
+    "PasswordHasher",
     "RegisterUser",
     "RegisterUserInput",
     "RegisterUserOutput",
