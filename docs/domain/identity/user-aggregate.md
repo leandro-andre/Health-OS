@@ -48,7 +48,7 @@ Email:
 - rejeita vazio;
 - rejeita formatos claramente invalidos.
 
-A unicidade de e-mail nao e responsabilidade do Value Object. Essa regra sera tratada posteriormente na camada apropriada, pois depende de outros usuarios.
+A unicidade de e-mail nao e responsabilidade do Value Object. A persistencia atual tambem protege essa regra com constraint unica no banco de dados.
 
 ### FullName
 
@@ -95,7 +95,20 @@ User pode ser reconstituido a partir da persistencia com:
 User.restore(...)
 ```
 
-A reidratacao recebe UserId, Email e FullName, mas nao registra UserRegistered. Persistencia concreta continuara sendo responsabilidade da camada de infraestrutura.
+A reidratacao recebe UserId, Email e FullName, mas nao registra UserRegistered. A persistencia concreta e responsabilidade da camada de infraestrutura.
+
+## Persistencia
+
+A persistencia do User foi implementada na infraestrutura com Django ORM.
+
+- UserRepository e o contrato da camada application;
+- DjangoUserRepository implementa esse contrato;
+- UserModel e detalhe de infraestrutura e nao representa o dominio;
+- UserModel persiste UUID como chave primaria, e-mail unico e full_name;
+- reidratacao via persistencia usa User.restore(...) e nao gera UserRegistered;
+- a unicidade de e-mail tambem e protegida pelo banco;
+- SQLite e utilizado atualmente;
+- os campos e migrations permanecem portaveis para PostgreSQL.
 
 ## Invariantes
 
@@ -111,7 +124,7 @@ E-mail podera ser alterado futuramente.
 
 Nome podera ser alterado futuramente.
 
-Essas operacoes nao fazem parte da Feature 004 atual.
+Essas operacoes nao fazem parte da Feature 005 atual.
 
 Possiveis operacoes futuras:
 
@@ -131,8 +144,6 @@ User.change_name(...)
 - verificacao de e-mail;
 - roles;
 - permissions;
-- persistencia Django;
-- repositories concretos;
 - serializers;
 - endpoints;
 - casos de uso;
@@ -148,16 +159,23 @@ User.change_name(...)
 - regras que dependem de outros usuarios, como unicidade de e-mail, nao pertencem ao Aggregate isoladamente;
 - UserRepository e um contrato da camada application;
 - implementacoes concretas de persistencia pertencem a infraestrutura;
+- Django ORM e detalhe de infraestrutura;
+- UserModel nao representa nem substitui User;
 - abstracoes prematuras devem ser evitadas.
 
 ## Status Da Feature
 
-Feature 004 — User Aggregate
+Feature 005 - User Repository & Persistence
 
 - [x] Domain Design
 - [x] Value Objects
 - [x] User Aggregate
 - [x] UserRegistered
-- [ ] Testes finais
+- [x] UserRepository
+- [x] UserModel
+- [x] UserMapper
+- [x] DjangoUserRepository
+- [x] Migration inicial
+- [x] Testes de integracao
 - [ ] Quality gates
 - [ ] Code Review
