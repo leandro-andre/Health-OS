@@ -20,6 +20,10 @@ class User(AggregateRoot[UserId]):
 
         return user
 
+    @classmethod
+    def restore(cls, user_id: UserId, email: Email, full_name: FullName) -> Self:
+        return cls(user_id=user_id, email=email, full_name=full_name)
+
     @property
     def email(self) -> Email:
         return self._email

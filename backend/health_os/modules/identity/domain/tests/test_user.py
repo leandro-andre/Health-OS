@@ -80,6 +80,28 @@ def test_user_register_generates_exactly_one_user_registered_event() -> None:
     assert isinstance(user.domain_events[0], UserRegistered)
 
 
+def test_user_restore_creates_user_with_received_values() -> None:
+    user_id = UserId(uuid4())
+    email = Email("leo@example.com")
+    full_name = FullName("Leandro André")
+
+    user = User.restore(user_id=user_id, email=email, full_name=full_name)
+
+    assert user.id == user_id
+    assert user.email == email
+    assert user.full_name == full_name
+
+
+def test_user_restore_does_not_register_user_registered_event() -> None:
+    user = User.restore(
+        user_id=UserId(uuid4()),
+        email=Email("leo@example.com"),
+        full_name=FullName("Leandro André"),
+    )
+
+    assert user.domain_events == ()
+
+
 def test_user_registered_event_has_user_id() -> None:
     user_id = UserId(uuid4())
 
@@ -163,6 +185,23 @@ def test_users_with_same_user_id_are_equal() -> None:
     )
 
     assert first_user == second_user
+
+
+def test_restored_user_preserves_aggregate_equality() -> None:
+    user_id = UserId(uuid4())
+
+    registered_user = User.register(
+        user_id=user_id,
+        email=Email("registered@example.com"),
+        full_name=FullName("Registered"),
+    )
+    restored_user = User.restore(
+        user_id=user_id,
+        email=Email("restored@example.com"),
+        full_name=FullName("Restored"),
+    )
+
+    assert restored_user == registered_user
 
 
 def test_user_identity_has_no_public_setter() -> None:

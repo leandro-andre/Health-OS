@@ -2,23 +2,23 @@
 
 ## Contexto
 
-User pertence ao bounded context Identity e representa a identidade lógica de uma pessoa dentro do Health OS.
+User pertence ao bounded context Identity e representa a identidade logica de uma pessoa dentro do Health OS.
 
-Dados de saúde não pertencem ao User. Informações clínicas, perfil de saúde e demais dados assistenciais devem viver em módulos próprios do domínio.
+Dados de saude nao pertencem ao User. Informacoes clinicas, perfil de saude e demais dados assistenciais devem viver em modulos proprios do dominio.
 
 ## Aggregate Root
 
 ### User
 
-User é o Aggregate Root de Identity para a identidade lógica de uma pessoa.
+User e o Aggregate Root de Identity para a identidade logica de uma pessoa.
 
 Responsabilidade:
 
-- representar a identidade do usuário;
+- representar a identidade do usuario;
 - manter sua identidade interna;
 - manter seu e-mail;
 - manter seu nome;
-- proteger as invariantes relacionadas à identidade.
+- proteger as invariantes relacionadas a identidade.
 
 Estado implementado:
 
@@ -35,37 +35,37 @@ UserId:
 - representa a identidade do User;
 - encapsula UUID;
 - possui igualdade por valor;
-- é imutável.
+- e imutavel.
 
 ### Email
 
 Email:
 
-- é imutável;
+- e imutavel;
 - possui igualdade por valor;
 - remove whitespace externo;
 - normaliza para lowercase;
 - rejeita vazio;
-- rejeita formatos claramente inválidos.
+- rejeita formatos claramente invalidos.
 
-A unicidade de e-mail não é responsabilidade do Value Object. Essa regra será tratada posteriormente na camada apropriada, pois depende de outros usuários.
+A unicidade de e-mail nao e responsabilidade do Value Object. Essa regra sera tratada posteriormente na camada apropriada, pois depende de outros usuarios.
 
 ### FullName
 
 FullName:
 
-- é imutável;
+- e imutavel;
 - possui igualdade por valor;
 - normaliza whitespace;
 - rejeita vazio;
-- aceita nomes com uma única palavra;
-- evita regras culturais excessivamente rígidas.
+- aceita nomes com uma unica palavra;
+- evita regras culturais excessivamente rigidas.
 
 ## Domain Events
 
 ### UserRegistered
 
-UserRegistered é emitido quando um User é registrado de forma válida.
+UserRegistered e emitido quando um User e registrado de forma valida.
 
 Payload implementado:
 
@@ -77,33 +77,43 @@ O evento preserva os metadados herdados do Shared Kernel:
 - event_id
 - occurred_at
 
-## Criação do Aggregate
+## Criacao Do Aggregate
 
-A criação do Aggregate utiliza uma factory semântica:
+A criacao de um novo Aggregate utiliza uma factory semantica:
 
 ```python
 User.register(...)
 ```
 
-A criação válida registra exatamente um UserRegistered.
+A criacao valida registra exatamente um UserRegistered.
+
+## Reidratacao
+
+User pode ser reconstituido a partir da persistencia com:
+
+```python
+User.restore(...)
+```
+
+A reidratacao recebe UserId, Email e FullName, mas nao registra UserRegistered. Persistencia concreta continuara sendo responsabilidade da camada de infraestrutura.
 
 ## Invariantes
 
 1. User sempre possui UserId.
-2. User sempre possui Email válido.
-3. User sempre possui FullName válido.
-4. A identidade do Aggregate não pode ser alterada.
-5. O registro válido de User produz UserRegistered.
+2. User sempre possui Email valido.
+3. User sempre possui FullName valido.
+4. A identidade do Aggregate nao pode ser alterada.
+5. O registro valido de User produz UserRegistered.
 
-## Alterações Futuras
+## Alteracoes Futuras
 
-E-mail poderá ser alterado futuramente.
+E-mail podera ser alterado futuramente.
 
-Nome poderá ser alterado futuramente.
+Nome podera ser alterado futuramente.
 
-Essas operações não fazem parte da Feature 004 atual.
+Essas operacoes nao fazem parte da Feature 004 atual.
 
-Possíveis operações futuras:
+Possiveis operacoes futuras:
 
 ```python
 User.change_email(...)
@@ -112,31 +122,33 @@ User.change_name(...)
 
 ## Fora Do Escopo
 
-- autenticação;
+- autenticacao;
 - senha;
 - JWT;
 - OAuth;
 - login social;
-- recuperação de senha;
-- verificação de e-mail;
+- recuperacao de senha;
+- verificacao de e-mail;
 - roles;
 - permissions;
-- persistência Django;
-- repositories;
+- persistencia Django;
+- repositories concretos;
 - serializers;
 - endpoints;
 - casos de uso;
-- perfil de saúde;
-- dados clínicos.
+- perfil de saude;
+- dados clinicos.
 
-## Decisões Arquiteturais
+## Decisoes Arquiteturais
 
-- domínio independente de Django e DRF;
-- User é Aggregate Root, não Django Model;
-- UserId, Email e FullName são Value Objects;
-- regras pertencentes ao próprio valor ficam nos Value Objects;
-- regras que dependem de outros usuários, como unicidade de e-mail, não pertencem ao Aggregate isoladamente;
-- abstrações prematuras devem ser evitadas.
+- dominio independente de Django e DRF;
+- User e Aggregate Root, nao Django Model;
+- UserId, Email e FullName sao Value Objects;
+- regras pertencentes ao proprio valor ficam nos Value Objects;
+- regras que dependem de outros usuarios, como unicidade de e-mail, nao pertencem ao Aggregate isoladamente;
+- UserRepository e um contrato da camada application;
+- implementacoes concretas de persistencia pertencem a infraestrutura;
+- abstracoes prematuras devem ser evitadas.
 
 ## Status Da Feature
 
